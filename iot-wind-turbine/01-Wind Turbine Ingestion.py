@@ -27,7 +27,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,Let's prepare our data first
-# MAGIC %run ./resources/00-setup $reset_all_data=$reset_all_data
+# MAGIC %run ./resources/00-setup $reset_all_data=true
 
 # COMMAND ----------
 
@@ -47,23 +47,6 @@
 # MAGIC   
 # MAGIC -- Turn on autocompaction to solve small files issues on your streaming job, that's all you have to do!
 # MAGIC alter table turbine_bronze set tblproperties ('delta.autoOptimize.autoCompact' = true, 'delta.autoOptimize.optimizeWrite' = true);
-
-# COMMAND ----------
-
-#Option 1, read from kinesis directly
-#Load stream from Kafka
-bronzeDF = spark.readStream \
-                .format("kafka") \
-                .option("kafka.bootstrap.servers", "kafkaserver1:9092,kafkaserver2:9092") \
-                .option("subscribe", "turbine") \
-                .load()
-
-#Write the output to a delta table
-bronzeDF.selectExpr("CAST(key AS STRING) as key", "CAST(value AS STRING) as value") \
-        .writeStream \
-        .option("ignoreChanges", "true") \
-        .trigger(once=True) \
-        .table("turbine_bronze")
 
 # COMMAND ----------
 
@@ -150,6 +133,12 @@ turbine_stream.join(turbine_status, ['id'], 'left') \
 
 # MAGIC %sql
 # MAGIC select * from turbine_gold;
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC GRANT SELECT ON DATABASE turbine_demo TO `data.scientist@databricks.com`;
+# MAGIC GRANT SELECT ON DATABASE turbine_demo TO `data.analyst@databricks.com`;
 
 # COMMAND ----------
 

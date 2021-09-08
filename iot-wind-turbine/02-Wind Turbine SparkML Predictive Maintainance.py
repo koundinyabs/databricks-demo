@@ -26,7 +26,7 @@
 
 # COMMAND ----------
 
-# MAGIC %run ./resources/00-setup $reset_all_data=$reset_all_data
+# MAGIC %run ./resources/00-setup $reset_all_data=false
 
 # COMMAND ----------
 
@@ -103,8 +103,8 @@ with mlflow.start_run():
 
 # DBTITLE 1,Save our new model to the registry as a new version
 #get the best model having the best metrics.AUROC from the registry
-best_models = mlflow.search_runs(filter_string='tags.model="turbine_gbt" and attributes.status = "FINISHED" and metrics.f1 > 0', order_by=['metrics.f1 DESC'], max_results=1)
-model_registered = mlflow.register_model("runs:/" + best_models.iloc[0].run_id + "/turbine_gbt", "turbine_gbt")
+best_models = mlflow.search_runs(filter_string='tags.model="kd_turbine_gbt" and attributes.status = "FINISHED" and metrics.f1 > 0', order_by=['metrics.f1 DESC'], max_results=1)
+model_registered = mlflow.register_model("runs:/" + best_models.iloc[0].run_id + "/kd_turbine_gbt", "kd_turbine_gbt")
 
 # COMMAND ----------
 
