@@ -2,13 +2,10 @@
 # MAGIC %md
 # MAGIC 
 # MAGIC # Delta Demo
-# MAGIC ## Ensuring Consistency with ACID Transactions with Delta Lake
+# MAGIC ## Ensuring Consistency with ACID Transactions with Delta Lake 
+# MAGIC ## ==> Simplified Data Engineering, Increased Reliability/Stability, Lower TCO
 # MAGIC 
 # MAGIC <img src="https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-logo-whitebackground.png" width=200/>
-# MAGIC 
-# MAGIC This is a companion notebook to provide a Delta Lake example against the Lending Club data.
-# MAGIC * This notebook has been tested with **Databricks Community Edition**: *5.4 ML, Python 3*
-# MAGIC %md
 # MAGIC 
 # MAGIC ## The Data
 # MAGIC 
@@ -22,26 +19,18 @@
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png) Delta Lake
-# MAGIC 
-# MAGIC Optimization Layer a top blob storage for Reliability (i.e. ACID compliance) and Low Latency of Streaming + Batch data pipelines.
-
-# COMMAND ----------
-
-# MAGIC %md
 # MAGIC <img src="https://arduino-databricks-public-s3-paris.s3.eu-west-3.amazonaws.com/Delta_Workshop/Delta-Reliability.png" alt="Reliability" width="1000">
 
 # COMMAND ----------
 
-# MAGIC %md # ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png) Delta Lake Hands-on Walkthrough 
-# MAGIC ## Part 1
+# MAGIC %md ## 1/ Import Data and create pre-Delta Lake Table ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
+# MAGIC * This will create a lot of small Parquet files emulating the typical small file problem that occurs with streaming or highly transactional data
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ---
-# MAGIC ## ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png) 1/ Import Data and create pre-Delta Lake Table
-# MAGIC * This will create a lot of small Parquet files emulating the typical small file problem that occurs with streaming or highly transactional data
+# MAGIC %sql
+# MAGIC CREATE DATABASE IF NOT EXISTS kd_delta;
+# MAGIC USE kd_delta;
 
 # COMMAND ----------
 
@@ -56,8 +45,8 @@ spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", False)
 
 data = spark.read.parquet("/databricks-datasets/samples/lending_club/parquet/")
 
-# Reduce the amount of data (to run on DBCE) 
-(loan_stats, loan_stats_rest) = data.randomSplit([0.01, 0.99], seed=123)
+# Optionally, reduce the amount of data (to run on DBCE) 
+(loan_stats, loan_stats_rest) = data.randomSplit([1.0, 0.0], seed=123)
 
 # Select only the columns needed
 loan_stats = loan_stats.select("addr_state", "loan_status", "loan_amnt", "grade") \
@@ -68,9 +57,12 @@ loan_stats.write.mode("overwrite") \
 .format("parquet") \
 .save("dbfs:/ml/loan_stats.parquet")
 
+#print(data.count(), loan_stats.count(), loan_stats_rest.count())
+
 # COMMAND ----------
 
-# MAGIC %md ## ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png) 2/ Easily Convert Parquet to Delta Lake format
+# MAGIC %md 
+# MAGIC ## 2/ Easily Convert Parquet to Delta Lake format ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
 # MAGIC With Delta Lake, you can easily transform your Parquet data into Delta Lake format. 
 
 # COMMAND ----------
@@ -91,19 +83,8 @@ loan_stats.write.mode("overwrite") \
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC show create table loan_stats_delta
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC -- View Parquet table
-# MAGIC SELECT * FROM loan_stats;
-
-# COMMAND ----------
-
-# MAGIC %sql
 # MAGIC -- View Delta Lake table
-# MAGIC SELECT * FROM loan_stats_delta;
+# MAGIC SELECT * FROM loan_stats_delta limit 25;
 
 # COMMAND ----------
 
@@ -112,16 +93,26 @@ loan_stats.write.mode("overwrite") \
 
 # COMMAND ----------
 
-# MAGIC %md ## ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png) 3/ Unified Batch and Streaming Source and Sink
+# MAGIC %sql
+# MAGIC DELETE FROM loan_stats_delta WHERE addr_state IN ('debt_consolidation', '531xx', 'IA'); 
+
+# COMMAND ----------
+
+# MAGIC %md ### 2.1/ Auto Loader ==> Rapid At Scale Migration
+# MAGIC 
+# MAGIC <img src="https://github.com/koundinyabs/databricks-demo/raw/main/AutoLoader.png" alt="Reliability" width="1000">
+
+# COMMAND ----------
+
+# MAGIC %md ## 3/ Unified Batch and Streaming Source and Sink ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
 # MAGIC 
 # MAGIC These cells showcase streaming and batch concurrent queries (inserts and reads)
 # MAGIC * This notebook will run an `INSERT` every 10s against our `loan_stats_delta` table
 # MAGIC * We will run two streaming queries concurrently against this data
-# MAGIC * Note, you can also use `writeStream` but this version is easier to run in DBCE
 
 # COMMAND ----------
 
-DELTALAKE_SILVER_PATH = "/user/hive/warehouse/loan_stats_delta"
+DELTALAKE_SILVER_PATH = "/user/hive/warehouse/kd_delta.db/loan_stats_delta"
 
 # COMMAND ----------
 
@@ -168,39 +159,16 @@ while i <= 6:
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC -- Review current loans within the `loan_stats_delta` Delta Lake table
-# MAGIC select addr_state, sum(`loan_amnt`) as total_amount from loan_stats_delta group by addr_state
-
-# COMMAND ----------
-
 # MAGIC %md
-# MAGIC ##![Delta Lake Logo Tiny](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png) 4/ Full DML Support
-# MAGIC 
-# MAGIC **Note**: Full DML Support is a feature that will be coming soon to Delta Lake; the preview is currently available in Databricks.
+# MAGIC ## 4/ Full DML Support ![Delta Lake Logo Tiny](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
 # MAGIC 
 # MAGIC Delta Lake supports standard DML including UPDATE, DELETE and MERGE INTO providing developers more controls to manage their big datasets.
 
 # COMMAND ----------
 
-# MAGIC %md ###![Delta Lake Logo Tiny](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png) 4.1/ DELETE Support
+# MAGIC %md ### 4.1/ DELETE Support ![Delta Lake Logo Tiny](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
 # MAGIC 
 # MAGIC The data was originally supposed to be assigned to `WA` state, so let's `DELETE` those values assigned to `IA`
-
-# COMMAND ----------
-
-# MAGIC %sql 
-# MAGIC show create table loan_stats_delta;
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC -- Attempting to run `DELETE` on the Parquet table
-# MAGIC DELETE FROM loan_stats WHERE addr_state = 'IA'
-
-# COMMAND ----------
-
-# MAGIC %md **Note**: This command fails because the `DELETE` statements are not supported in Parquet, but are supported in Delta Lake.
 
 # COMMAND ----------
 
@@ -216,18 +184,8 @@ while i <= 6:
 
 # COMMAND ----------
 
-# MAGIC %md ###![Delta Lake Logo Tiny](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png) 4.2/ UPDATE Support
+# MAGIC %md ### 4.2/ UPDATE Support ![Delta Lake Logo Tiny](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png) 
 # MAGIC The data was originally supposed to be assigned to `WA` state, so let's `UPDATE` those values
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC -- Attempting to run `UPDATE` on the Parquet table
-# MAGIC UPDATE loan_stats SET `loan_status` = 'Fully Paid' WHERE addr_state = 'WA'
-
-# COMMAND ----------
-
-# MAGIC %md **Note**: This command fails because the `UPDATE` statements are not supported in Parquet, but are supported in Delta Lake.
 
 # COMMAND ----------
 
@@ -243,7 +201,7 @@ while i <= 6:
 
 # COMMAND ----------
 
-# MAGIC %md ###![Delta Lake Logo Tiny](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png) 4.3/ MERGE INTO Support
+# MAGIC %md ### 4.3/ MERGE INTO Support ![Delta Lake Logo Tiny](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
 # MAGIC 
 # MAGIC #### INSERT or UPDATE parquet: 7-step process
 # MAGIC 
@@ -266,12 +224,6 @@ while i <= 6:
 # MAGIC 2. Use `MERGE`
 # MAGIC 
 # MAGIC #### We'll be using the loan_stats_delta table and merge new data into it. Let's review our columns:
-
-# COMMAND ----------
-
-# MAGIC %sql 
-# MAGIC 
-# MAGIC SELECT * FROM loan_stats_delta LIMIT 10;
 
 # COMMAND ----------
 
@@ -323,52 +275,16 @@ while i <= 6:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ---
-# MAGIC ##![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png) 5/ Delta Lake and Data Quality
+# MAGIC ## 5/ Data Quality ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ###![Delta Lake Logo Tiny](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png) 5.1/ Schema enforcement with Delta Lake
+# MAGIC ### 5.1/ Schema enforcement with Delta Lake ![Delta Lake Logo Tiny](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
 
 # COMMAND ----------
 
-# MAGIC %md #### Let's insert incorrect string instead of Integer in the "loan_amnt" column using PARQUET (not DELTA!)
-
-# COMMAND ----------
-
-loan_stats.write.mode("overwrite").format("parquet").save("/ml/loan_stats_error.parquet")
-display(spark.read.parquet("/ml/loan_stats_error.parquet"))
-
-# COMMAND ----------
-
-#          addr_state  loan_status   loan_amnt  grade id
-items =   [('PARIS',   "fully Paid", "2500",    "A",  9999998),
-           ('PARIS',   "fully Paid", "13",      "A",  9999999)]
-incorrect_data = spark.createDataFrame(items, ['addr_state', 'loan_status', 'loan_amnt', 'grade', 'id'])
-incorrect_data.write.format("parquet").mode("append").save("/ml/loan_stats_error.parquet")
-
-# COMMAND ----------
-
-# MAGIC %md #### No error at write time...
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC #### Let's try to read... 
-
-# COMMAND ----------
-
-display(spark.read.parquet("/ml/loan_stats_error.parquet").filter("addr_state in ('PARIS', 'TX')"))
-
-# COMMAND ----------
-
-# MAGIC %md 
-# MAGIC ### Suprise!
-
-# COMMAND ----------
-
-# MAGIC %md #### Instead of using PARQUET, we can switch to a DELTA table:
+# MAGIC %md ** ==> Delta protects against data corruption and automatically do schema enforcement on write!**
 
 # COMMAND ----------
 
@@ -380,12 +296,8 @@ incorrect_data.write.format("delta").mode("append").save(DELTALAKE_SILVER_PATH)
 
 # COMMAND ----------
 
-# MAGIC %md ** ==> Delta protects against data corruption and automatically do schema enforcement on write!**
-
-# COMMAND ----------
-
 # MAGIC %md
-# MAGIC ###![Delta Lake Logo Tiny](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png) 5.2/ Schema Evolution
+# MAGIC ### 5.2/ Schema Evolution ![Delta Lake Logo Tiny](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
 # MAGIC With the `mergeSchema` option, you can evolve your Delta Lake table schema
 
 # COMMAND ----------
@@ -426,7 +338,12 @@ data_with_zip_code.write.option("mergeSchema","true").format("delta").mode("appe
 
 # COMMAND ----------
 
-# MAGIC %md ## ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png) 6/ Let's Travel back in Time!
+# MAGIC %sql
+# MAGIC DESCRIBE HISTORY loan_stats_delta;
+
+# COMMAND ----------
+
+# MAGIC %md ## 6/ Let's Travel back in Time! ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
 # MAGIC Databricks Delta’s time travel capabilities simplify building data pipelines for the following use cases. 
 # MAGIC 
 # MAGIC * Audit Data Changes
@@ -445,7 +362,7 @@ data_with_zip_code.write.option("mergeSchema","true").format("delta").mode("appe
 
 # COMMAND ----------
 
-# MAGIC %md ### ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png) 6.1/ Review Delta Lake Table History
+# MAGIC %md ### 6.1/ Review Delta Lake Table History ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
 # MAGIC All the transactions for this table are stored within this table including the initial set of insertions, update, delete, merge, and inserts with schema modification
 
 # COMMAND ----------
@@ -462,8 +379,13 @@ data_with_zip_code.write.option("mergeSchema","true").format("delta").mode("appe
 
 # COMMAND ----------
 
-# MAGIC %md ### ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png) 6.2/ Time Travel via Version Number
+# MAGIC %md ### 6.2/ Time Travel via Version Number ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
 # MAGIC Below are SQL syntax examples of Delta Time Travel by using a Version Number
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC SELECT * FROM loan_stats_delta VERSION AS OF 14 WHERE addr_state="IA" LIMIT 10
 
 # COMMAND ----------
 
@@ -473,14 +395,7 @@ data_with_zip_code.write.option("mergeSchema","true").format("delta").mode("appe
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC SELECT * FROM loan_stats_delta VERSION AS OF 4 limit 10
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ---
-# MAGIC ### ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png) 7/ Run concurrent queries with ACID transactions
+# MAGIC %md ## 7/ Run concurrent queries with ACID transactions ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
 # MAGIC 
 # MAGIC Using DELTA, you can safely run concurrent requests. One of them will rollback if two processes update the same data!
 
@@ -496,7 +411,7 @@ data_with_zip_code.write.option("mergeSchema","true").format("delta").mode("appe
 
 # COMMAND ----------
 
-loan_stats.write.format("delta").mode("overwrite").save("/ml/demo_delta/loanstats_concurrent_delta.delta")
+loan_stats.write.partitionBy("addr_state").format("delta").option("overwriteSchema", "true").mode("overwrite").save("/ml/demo_delta/loanstats_concurrent_delta.delta")
 
 
 # COMMAND ----------
@@ -509,18 +424,18 @@ loan_stats.write.format("delta").mode("overwrite").save("/ml/demo_delta/loanstat
 
 # COMMAND ----------
 
-# DBTITLE 1,ACID Transactions: Running a SELECT and an UPDATE on the table at the same time
+# DBTITLE 1,ACID Transactions: Running Concurrent (non-conflicting) UPDATEs on the table at the same time
 import threading, time
 
-def select_data():
-  spark.sql("select * from loan_delta_concurrent where addr_state='CA'")
-def update_data():
+def update_ca_data():
   spark.sql("update loan_delta_concurrent set grade='A' where addr_state='CA'")
+def update_wa_data():
+  spark.sql("update loan_delta_concurrent set grade='A' where addr_state='WA'")
   
-thread = threading.Thread(target=select_data)
+thread = threading.Thread(target=update_ca_data)
 thread.start()
 time.sleep(1)
-thread2 = threading.Thread(target=update_data)
+thread2 = threading.Thread(target=update_wa_data)
 thread2.start()
 thread.join()
 thread2.join()
@@ -528,22 +443,13 @@ thread2.join()
 
 # COMMAND ----------
 
-# DBTITLE 1,ACID Transactions with WRITE CONFLICTS: Running an UPDATE and a DELETE on the same data at the same time
-import threading, time
+# MAGIC %sql
+# MAGIC select * from loan_delta_concurrent where addr_state="CA" limit 10;
 
-def delete_data():
-  spark.sql("delete from loan_delta_concurrent where addr_state='CA'")
-def update_data():
-  spark.sql("update loan_delta_concurrent set addr_state='CALIFORNIA' where addr_state='CA'")
-  
-thread = threading.Thread(target=delete_data)
-thread.start()
-time.sleep(1)
-thread2 = threading.Thread(target=update_data)
-thread2.start()
-thread.join()
-thread2.join()
+# COMMAND ----------
 
+# MAGIC %sql
+# MAGIC DESCRIBE HISTORY loan_delta_concurrent;
 
 # COMMAND ----------
 
@@ -557,16 +463,16 @@ thread2.join()
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ---
-# MAGIC ## ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png) 8/ Performance boost in Delta !
+# MAGIC 
+# MAGIC ## 8/ Performance boost in Delta ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
 # MAGIC 
 # MAGIC Read are much faster using delta. Let's see how it works !
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ---
-# MAGIC ### ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png) 8.1/ Compaction with Delta
+# MAGIC 
+# MAGIC ### 8.1/ Compaction with Delta ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
 
 # COMMAND ----------
 
@@ -575,15 +481,15 @@ loan_stats.repartition(1000).write.format("delta").mode("overwrite").save("/ml/d
 
 # COMMAND ----------
 
+len(dbutils.fs.ls('/ml/demo_delta/loanstats_perf_delta.delta'))
+
+# COMMAND ----------
+
 # MAGIC %sql
 # MAGIC DROP TABLE IF EXISTS loan_perf_delta;
 # MAGIC CREATE TABLE loan_perf_delta
 # MAGIC USING delta
 # MAGIC LOCATION '/ml/demo_delta/loanstats_perf_delta.delta';
-
-# COMMAND ----------
-
-# MAGIC %fs ls /ml/demo_delta/loanstats_perf_delta.delta
 
 # COMMAND ----------
 
@@ -615,15 +521,24 @@ loan_stats.repartition(1000).write.format("delta").mode("overwrite").save("/ml/d
 
 # COMMAND ----------
 
+# DBTITLE 1,Auto-Optimized Writes
 # MAGIC %md
 # MAGIC 
-# MAGIC ### ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png) 8.2/ ZORDER with Delta
+# MAGIC `alter table loan_stats_delta set tblproperties ('delta.autoOptimize.autoCompact' = true, 'delta.autoOptimize.optimizeWrite' = true);`
+# MAGIC 
+# MAGIC ![Auto-Optimized Writes](https://docs.databricks.com/_images/optimized-writes.png) 
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC 
+# MAGIC ###  8.2/ ZORDER with Delta ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
 # MAGIC 
 # MAGIC <img src="https://arduino-databricks-public-s3-paris.s3.eu-west-3.amazonaws.com/Delta_Workshop/Delta-Zorder.png" alt="Zorder" width="1000">
 
 # COMMAND ----------
 
-# DBTITLE 1,Zorder can increase further our read time by collocating similar data:
+# DBTITLE 1,Zorder can further decrease our read time by collocating similar data:
 # MAGIC %sql
 # MAGIC OPTIMIZE loan_perf_delta ZORDER BY (addr_state, grade);
 # MAGIC -- Super efficient queries as tabled are now ZORDERED by addr_state and grade!
@@ -636,7 +551,7 @@ loan_stats.repartition(1000).write.format("delta").mode("overwrite").save("/ml/d
 # COMMAND ----------
 
 # MAGIC %md 
-# MAGIC ### ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png) 8.2/ Scalable metadata
+# MAGIC ### 8.3/ Scalable metadata  ![Delta Lake Tiny Logo](https://pages.databricks.com/rs/094-YMS-629/images/delta-lake-tiny-logo.png)
 # MAGIC 
 # MAGIC Our table metadata is now stored in a parquet checkpoint file, no need to list all the files or aggressively query the metastore
 
@@ -651,3 +566,12 @@ loan_stats.repartition(1000).write.format("delta").mode("overwrite").save("/ml/d
 # COMMAND ----------
 
 # MAGIC %md ** ==> Combining delta, zorder, data skipping and local caching, we can reach x100 read speed on TB of data ! **
+
+# COMMAND ----------
+
+# MAGIC %md ## 9/ Demo Cleanup
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC DROP DATABASE IF EXISTS kd_delta CASCADE;
